@@ -3,6 +3,4 @@ numpy
 matplotlib
 networkx
 icecream
-tqdm
-wandb
-
+scipy
