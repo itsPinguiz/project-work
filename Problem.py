@@ -1,94 +1,79 @@
-import networkx as nx
+import logging
+from itertools import combinations
+
 import numpy as np
-import random
+import matplotlib.pyplot as plt
+import networkx as nx
+
+from icecream import ic
 
 class Problem:
-    def __init__(self, n, density, alpha, beta, seed=None):
-        self.n = n
-        self.density = density
-        self.alpha = alpha
-        self.beta = beta
-        self.seed = seed
-        
-        if seed is not None:
-            np.random.seed(seed)
-            random.seed(seed)
-        
-        # Create Random Graph
-        # We attempt to create a connected graph. 
-        # If the random graph is disconnected, we force connections.
-        connected = False
-        while not connected:
-            self.graph = nx.gnp_random_graph(n, density, directed=False, seed=seed)
-            if nx.is_connected(self.graph):
-                connected = True
-            elif seed is not None: 
-                # Force connection for seeded instances if they fail initial check
-                components = list(nx.connected_components(self.graph))
-                for i in range(len(components) - 1):
-                    u = list(components[i])[0]
-                    v = list(components[i+1])[0]
-                    self.graph.add_edge(u, v)
-                    # Add random weight for this forced edge
-                    self.graph[u][v]['dist'] = np.random.random() * 10
-                connected = True
+    _graph: nx.Graph
+    _alpha: float
+    _beta: float
 
-        # Assign Weights (Distance) and Gold
-        # Note: 'dist' is assigned here for existing edges
-        for u, v in self.graph.edges():
-            if 'dist' not in self.graph[u][v]:
-                self.graph[u][v]['dist'] = np.random.random() * 10 
-            
-        for node in self.graph.nodes():
-            if node == 0:
-                self.graph.nodes[node]['gold'] = 0
-            else:
-                self.graph.nodes[node]['gold'] = np.random.random() * 10
+    def __init__(
+        self,
+        num_cities: int,
+        *,
+        alpha: float = 1.0,
+        beta: float = 1.0,
+        density: float = 0.5,
+        seed: int = 42,
+    ):
+        rng = np.random.default_rng(seed)
+        self._alpha = alpha
+        self._beta = beta
+        cities = rng.random(size=(num_cities, 2))
+        cities[0, 0] = cities[0, 1] = 0.5
 
-    def evaluate_path(self, path):
-        """
-        Validates the path and calculates the total cost.
-        Returns: (Total Cost, Status String)
-        """
-        # Check Format
-        if not path or path[0] != 0 or path[-1] != 0:
-            return float('inf'), "Invalid: Must start and end at Depot (0)"
-        
-        # Check all cities visited
-        visited = set(path)
-        all_cities = set(range(self.n))
-        if visited != all_cities:
-            return float('inf'), f"Invalid: Missed cities {all_cities - visited}"
-            
-        current_gold = 0
+        self._graph = nx.Graph()
+        self._graph.add_node(0, pos=(cities[0, 0], cities[0, 1]), gold=0)
+        for c in range(1, num_cities):
+            self._graph.add_node(c, pos=(cities[c, 0], cities[c, 1]), gold=(1 + 999 * rng.random()))
+
+        tmp = cities[:, np.newaxis, :] - cities[np.newaxis, :, :]
+        d = np.sqrt(np.sum(np.square(tmp), axis=-1))
+        for c1, c2 in combinations(range(num_cities), 2):
+            if rng.random() < density or c2 == c1 + 1:
+                self._graph.add_edge(c1, c2, dist=d[c1, c2])
+
+        assert nx.is_connected(self._graph)
+
+    @property
+    def graph(self) -> nx.Graph:
+        return nx.Graph(self._graph)
+
+    @property
+    def alpha(self):
+        return self._alpha
+
+    @property
+    def beta(self):
+        return self._beta
+
+    def cost(self, path, weight):
+        dist = nx.path_weight(self._graph, path, weight='dist')
+        return dist + (self._alpha * dist * weight) ** self._beta
+
+    def baseline(self):
         total_cost = 0
-        
-        # Simulate Path
-        for i in range(len(path) - 1):
-            u, v = path[i], path[i+1]
-            
-            # Check Edge Existence
-            if not self.graph.has_edge(u, v):
-                return float('inf'), f"Invalid: No edge between {u} and {v}"
-                
-            dist = self.graph[u][v]['dist']
-            
-            # Cost Formula
-            step_cost = dist + (dist * current_gold * self.alpha) ** self.beta
-            total_cost += step_cost
-            
-            # Logic: 
-            # - If we arrive at Depot (0), we drop off gold (reset to 0).
-            # - If we arrive at a City, we pick up its gold.
-            #   (Simplified validation: assumes we pick up gold the first time we visit)
-            if v == 0:
-                current_gold = 0
-            else:
-                # We simply add the gold of node v. 
-                # Note: A smarter validator might track which gold has already been picked up,
-                # but for this specific problem definition, we assume full pickup on visit.
-                total_cost_check = total_cost # Snapshot for debugging if needed
-                gold_at_v = self.graph.nodes[v]['gold']
-                current_gold += gold_at_v
-        
-        return total_cost, "Valid"
+        for dest, path in nx.single_source_dijkstra_path(
+            self._graph, source=0, weight='dist'
+        ).items():
+            cost = 0
+            for c1, c2 in zip(path, path[1:]):
+                cost += self.cost([c1, c2], 0)
+                cost += self.cost([c1, c2], self._graph.nodes[dest]['gold'])
+            logging.debug(
+                f"dummy_solution: go to {dest} ({' > '.join(str(n) for n in path)} ({cost})"
+            )
+            total_cost += cost
+        return total_cost
+
+    def plot(self):
+        plt.figure(figsize=(10, 10))
+        pos = nx.get_node_attributes(self._graph, 'pos')
+        size = [100] + [self._graph.nodes[n]['gold'] for n in range(1, len(self._graph))]
+        color = ['red'] + ['lightblue'] * (len(self._graph) - 1)
+        return nx.draw(self._graph, pos, with_labels=True, node_color=color, node_size=size)
