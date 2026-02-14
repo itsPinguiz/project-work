@@ -1,0 +1,13 @@
+================================================================================
+VRP OPTIMIZATION TEST RESULTS
+================================================================================
+Generated: 2026-02-14 21:01:53
+Mode: Full Comparison with Baseline
+Status: Running...
+================================================================================
+
+Test #  1 | N=112 | α= 4.08 | β= 1.33 | density=0.77 | baseline=    9.95e+05 | solution=    1.69e+05 | improvement= 83.04% | time=76.9793s | Better
+Test #  2 | N= 30 | α= 1.20 | β= 1.20 | density=0.33 | baseline=    2.58e+04 | solution=    1.24e+04 | improvement= 51.98% | time= 0.4296s | Better
+Test #  3 | N= 97 | α= 2.00 | β= 1.14 | density=0.69 | baseline=    7.74e+04 | solution=    4.61e+04 | improvement= 40.46% | time= 9.8736s | Better
+Test #  4 | N=318 | α= 4.86 | β= 4.25 | density=0.43 | baseline=    4.44e+15 | solution=    2.41e+06 | improvement=100.00% | time=1053.5324s | Better
+Test #  5 | N=201 | α= 4.96 | β= 3.28 | density=0.67 | baseline=    3.72e+12 | solution=    1.18e+06 | improvement=100.00% | time=479.6239s | Better

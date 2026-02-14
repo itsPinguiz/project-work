@@ -1,6 +1,6 @@
-jupyter
 numpy
 matplotlib
 networkx
 icecream
 scipy
+tqdm
